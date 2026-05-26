@@ -219,12 +219,12 @@
     });
 
     // 2. PROCESSAR EL TEXT REBUT PER BLUETOOTH
+        // 2. PROCESSAR EL TEXT REBUT PER BLUETOOTH
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
         
-        // Netejar a fons eliminant caràcters ocults o salts de línia
         let cleanedString = rawString.replace(/[^\d.-]/g, '');
         
         if (cleanedString) {
@@ -239,36 +239,38 @@
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                // Forçar el primer punt a la gràfica si encara està buida
-               if (chart && chart.data.datasets[0].data.length === 0) {
-
+                // SI LA GRÀFICA ESTÀ BUIDA, FORÇEM EL PRIMER PUNT AL MOMENT
+                if (chart && chart.data.datasets[0].data.length === 0) {
                     registrarTemperaturaEnGrafica();
                 }
             }
         }
     }
 
-        // 3. REGISTRAR DADES A LA GRÀFICA (Versió corregida per a Chart.js)
+
+           // 3. REGISTRAR DADES A LA GRÀFICA
     function registrarTemperaturaEnGrafica() {
         if (ultimaTemperatura !== null && chart) {
             const ara = new Date();
             const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
-            // AFEGIR LES DADES AMB LA SINTAXI CORRECTA [0]
+            // Afegir l'hora a l'eix X
             chart.data.labels.push(horaText);
+            
+            // Afegir la temperatura a la línia blava (Sintaxi correcta universal de Chart.js)
             chart.data.datasets[0].data.push(ultimaTemperatura);
             
-            // Limitar a un màxim de 20 punts per pantalla perquè no s'acumulin
+            // Limitar a un màxim de 20 punts per pantalla perquè no es col·lapsi
             if (chart.data.labels.length > 20) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
             }
             
+            // Forçar la gràfica a redibuixar-se a la pantalla
             chart.update();
-            console.log("Punt registrat a la gràfica:", ultimaTemperatura, "a les", horaText);
+            console.log("Punt dibuixat amb èxit:", ultimaTemperatura, "a les", horaText);
         }
     }
-
 
     // 4. CONFIGURAR LA GRÀFICA DE CHART.JS (Al final de tot per protegir el codi)
     try {
