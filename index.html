@@ -210,12 +210,17 @@
     let llistaTemperatures = [];
     let llistaHores = [];
 
-    // ACCIÓ DEL BOTÓ DE CONNEXIÓ
+        // ACCIÓ DEL BOTÓ DE CONNEXIÓ (Versió de màxima compatibilitat)
     connectBtn.addEventListener('click', async () => {
         try {
             statusText.innerText = "Buscant micro:bit...";
+            
+            // Sol·licitud forçada amb filtre ampli per obligar Chrome a obrir la finestra
             device = await navigator.bluetooth.requestDevice({
-                filters: [{ namePrefix: 'BBC micro:bit' }],
+                filters: [
+                    { namePrefix: 'BBC micro:bit' },
+                    { services: [UART_SERVICE_UUID] }
+                ],
                 optionalServices: [UART_SERVICE_UUID]
             });
 
@@ -232,10 +237,9 @@
             characteristic.addEventListener('characteristicvaluechanged', handleData);
 
             statusText.innerText = "Connectat! Prem el Botó A a la micro:bit.";
-            connectBtn.style.display = 'none';
+            connectBtn.style.style.display = 'none';
             timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
 
-            // Temporitzador per registrar cada 10 minuts (600000 ms)
             intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
 
             device.addEventListener('gattserverdisconnected', () => {
@@ -248,38 +252,40 @@
 
         } catch (error) {
             console.error(error);
-            statusText.innerText = "Error: " + error.message;
+            statusText.innerText = "Error de connexió: " + error.message;
         }
     });
 
-    // RECEPCIÓ DE DADES DES DE LA MICRO:BIT
+
+        // RECEPCIÓ DE DADES DES DE LA MICRO:BIT (Extracció directa)
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
         
-        // Extreure qualsevol dígit, negatius o decimals de la resposta
-        let cleanedString = rawString.replace(/[^\d.-]/g, '');
+        // Busquem directament la seqüència de números que hi hagi dins del text rebu
+        let match = rawString.match(/[-?0-9]+/);
         
-        if (cleanedString !== "") {
-            let temperatura = parseFloat(cleanedString);
+        if (match) {
+            let temperatura = parseFloat(match[0]);
             
             if (!isNaN(temperatura)) {
                 ultimaTemperatura = temperatura;
 
-                // Moure el termòmetre visual immediatament
+                // Moure el termòmetre vermell
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                // Si és la primera vegada absoluta, pintem la barra de forma immediata
+                // Forçar la primera barra si l'historial està buit
                 if (llistaTemperatures.length === 0) {
                     registrarTemperaturaEnGrafica();
                 }
             }
         }
     }
+
 
     // REGISTRAR I DIBUIXAR LES BARRES
     function registrarTemperaturaEnGrafica() {
