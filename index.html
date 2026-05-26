@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Termòmetre i Gràfica micro:bit</title>
-    <!-- Línia per evitar l'error inofensiu del favicon -->
     <link rel="icon" href="data:,">
     <style>
         body {
@@ -165,13 +164,12 @@
 <body>
 
 <div class="card control-panel">
-    <h1>Termòmetre amb Històric Digital Natiu</h1>
+    <h1>Termòmetre amb Històric Digital</h1>
     <button id="connectBtn">Connectar micro:bit</button>
     <div id="status" class="status">Desconnectat. Clica per connectar el Bluetooth.</div>
 </div>
 
 <div class="dashboard">
-    <!-- Targeta del Termòmetre -->
     <div class="card thermometer-card">
         <h2>Valor Actual (Botó A)</h2>
         <div class="thermometer-container">
@@ -181,12 +179,9 @@
         <div id="tempDisplay" class="temperature-text">-- °C</div>
     </div>
 
-    <!-- Targeta de la Gràfica -->
     <div class="card chart-card">
         <h2>Historial de Temperatura (Cada 10 min)</h2>
-        <div id="graficaVisual" class="visual-bar-container">
-            <!-- Les barres es pintaran aquí de forma dinàmica -->
-        </div>
+        <div id="graficaVisual" class="visual-bar-container"></div>
         <div id="timerDisplay" class="timer-text">Esperant connexió...</div>
     </div>
 </div>
@@ -206,21 +201,16 @@
     let ultimaTemperatura = null; 
     let intervalGrafica = null;
     
-    // Estructura simplificada neta per guardar les dades sense objectes complexos
     let llistaTemperatures = [];
     let llistaHores = [];
 
-        // ACCIÓ DEL BOTÓ DE CONNEXIÓ (Versió de màxima compatibilitat)
+    // ACCIÓ DEL BOTÓ DE CONNEXIÓ
     connectBtn.addEventListener('click', async () => {
         try {
             statusText.innerText = "Buscant micro:bit...";
             
-            // Sol·licitud forçada amb filtre ampli per obligar Chrome a obrir la finestra
             device = await navigator.bluetooth.requestDevice({
-                filters: [
-                    { namePrefix: 'BBC micro:bit' },
-                    { services: [UART_SERVICE_UUID] }
-                ],
+                filters: [{ namePrefix: 'BBC micro:bit' }],
                 optionalServices: [UART_SERVICE_UUID]
             });
 
@@ -237,7 +227,7 @@
             characteristic.addEventListener('characteristicvaluechanged', handleData);
 
             statusText.innerText = "Connectat! Prem el Botó A a la micro:bit.";
-            connectBtn.style.style.display = 'none';
+            connectBtn.style.display = 'none';
             timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
 
             intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
@@ -245,40 +235,36 @@
             device.addEventListener('gattserverdisconnected', () => {
                 statusText.innerText = "Dispositiu desconnectat.";
                 connectBtn.style.display = 'inline-block';
-                timerDisplay.innerText = "Esperant connexió...";
+                timerDisplay.innerText = "Esperant connexió... (Dispositiu desconnectat)";
                 clearInterval(intervalGrafica);
                 ultimaTemperatura = null;
             });
 
         } catch (error) {
             console.error(error);
-            statusText.innerText = "Error de connexió: " + error.message;
+            statusText.innerText = "Error: " + error.message;
         }
     });
 
-
-        // RECEPCIÓ DE DADES DES DE LA MICRO:BIT (Extracció directa)
+    // RECEPCIÓ DE DADES
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
         
-        // Busquem directament la seqüència de números que hi hagi dins del text rebu
-        let match = rawString.match(/[-?0-9]+/);
+        let cleanedString = rawString.replace(/[^\d.-]/g, '');
         
-        if (match) {
-            let temperatura = parseFloat(match[0]);
+        if (cleanedString !== "") {
+            let temperatura = parseFloat(cleanedString);
             
             if (!isNaN(temperatura)) {
                 ultimaTemperatura = temperatura;
 
-                // Moure el termòmetre vermell
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                // Forçar la primera barra si l'historial està buit
                 if (llistaTemperatures.length === 0) {
                     registrarTemperaturaEnGrafica();
                 }
@@ -286,30 +272,44 @@
         }
     }
 
-
-    // REGISTRAR I DIBUIXAR LES BARRES
+    // REGISTRAR HISTÒRIC
     function registrarTemperaturaEnGrafica() {
         if (ultimaTemperatura !== null) {
             const ara = new Date();
             const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
-            // Afegir dades a les llistes bàsiques
             llistaHores.push(horaText);
             llistaTemperatures.push(ultimaTemperatura);
             
-            // Limitar el gràfic a les últimes 10 lectures
             if (llistaTemperatures.length > 10) {
                 llistaHores.shift();
                 llistaTemperatures.shift();
             }
             
-            // Re-dibuixar les barres visuals de la pantalla
             graficaVisual.innerHTML = "";
             for (let i = 0; i < llistaTemperatures.length; i++) {
                 let temp = llistaTemperatures[i];
                 let hora = llistaHores[i];
                 
-                // Calcular alçada basat en escala 0-50°C
                 let alcadaBarra = ((temp - 0) / (50 - 0)) * 100;
                 alcadaBarra = Math.max(8, Math.min(100, alcadaBarra)); 
                 
+                let barraElement = document.createElement("div");
+                barraElement.className = "bar";
+                barraElement.style.height = alcadaBarra + "%";
+                barraElement.title = `Hora: ${hora} | Temp: ${temp}°C`;
+                barraElement.innerText = temp + "°";
+                
+                graficaVisual.appendChild(barraElement);
+            }
+            
+            let resumText = "Històric guardat: ";
+            for (let i = 0; i < llistaTemperatures.length; i++) {
+                resumText += `[${llistaHores[i]}: ${llistaTemperatures[i]}°C] `;
+            }
+            timerDisplay.innerText = resumText;
+        }
+    }
+</script>
+</body>
+</html>
