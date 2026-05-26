@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Termòmetre i Gràfica micro:bit</title>
     <!-- Carreguem la llibreria Chart.js des del seu CDN oficial -->
-    <script src="https://jsdelivr.net"></script>
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -175,36 +175,7 @@
     let intervalGrafica = null;
     let chart = null;
 
-    // Configurar la gràfica de Chart.js
-    const ctx = document.getElementById('tempChart').getContext('2d');
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [], // Aquí aniran les hores (ex: "14:32")
-            datasets: [{
-                label: 'Temperatura (°C)',
-                data: [], // Aquí aniran els valors numèrics
-                borderColor: '#007bff',
-                backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                borderWidth: 3,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    min: 0,
-                    max: 50,
-                    title: { display: true, text: 'Temperatura (°C)' }
-                },
-                x: {
-                    title: { display: true, text: 'Hora del registre' }
-                }
-            }
-        }
-    });
+   
 
     // Funció per afegir dades a la gràfica
     function registrarTemperaturaEnGrafica() {
@@ -293,6 +264,37 @@
                 // Si és la primeríssima dada que rebem, la pintem ja a la gràfica perquè no comenci buida
                 if (chart.data.datasets[0].data.length === 0) {
                     registrarTemperaturaEnGrafica();
+                    
+                    // Configurar la gràfica de Chart.js
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], // Aquí aniran les hores (ex: "14:32")
+            datasets: [{
+                label: 'Temperatura (°C)',
+                data: [], // Aquí aniran els valors numèrics
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 50,
+                    title: { display: true, text: 'Temperatura (°C)' }
+                },
+                x: {
+                    title: { display: true, text: 'Hora del registre' }
+                }
+            }
+        }
+    });
                 }
             }
         }
