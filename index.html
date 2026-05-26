@@ -240,32 +240,35 @@
                 fluid.style.height = percentatge + "%";
 
                 // Forçar el primer punt a la gràfica si encara està buida
-                if (chart && chart.data.datasets[0].data.length === 0) {
+               if (chart && chart.data.datasets[0].data.length === 0) {
+
                     registrarTemperaturaEnGrafica();
                 }
             }
         }
     }
 
-    // 3. REGISTRAR DADES A LA GRÀFICA
+        // 3. REGISTRAR DADES A LA GRÀFICA (Versió corregida per a Chart.js)
     function registrarTemperaturaEnGrafica() {
         if (ultimaTemperatura !== null && chart) {
             const ara = new Date();
             const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
-            // Afegir dades correctament a l'estructura de Chart.js
+            // AFEGIR LES DADES AMB LA SINTAXI CORRECTA [0]
             chart.data.labels.push(horaText);
             chart.data.datasets[0].data.push(ultimaTemperatura);
             
-            // Limitar a un màxim de 20 punts per pantalla
+            // Limitar a un màxim de 20 punts per pantalla perquè no s'acumulin
             if (chart.data.labels.length > 20) {
                 chart.data.labels.shift();
                 chart.data.datasets[0].data.shift();
             }
             
             chart.update();
+            console.log("Punt registrat a la gràfica:", ultimaTemperatura, "a les", horaText);
         }
     }
+
 
     // 4. CONFIGURAR LA GRÀFICA DE CHART.JS (Al final de tot per protegir el codi)
     try {
