@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Termòmetre i Gràfica micro:bit</title>
-    <!-- Carreguem la llibreria Chart.js des del seu CDN oficial -->
+    <!-- Llibreria oficial Chart.js des d'un servidor altament fiable per a GitHub Pages -->
     <script src="https://cloudflare.com"></script>
     <style>
         body {
@@ -161,6 +161,7 @@
 </div>
 
 <script>
+    // UUIDs oficials del servei UART de micro:bit
     const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
     const UART_TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
@@ -175,31 +176,7 @@
     let intervalGrafica = null;
     let chart = null;
 
-   
-
-    // Funció per afegir dades a la gràfica
-    function registrarTemperaturaEnGrafica() {
-        if (ultimaTemperatura !== null) {
-            const ara = new Date();
-            // Formatar l'hora actual en format "HH:MM:SS"
-            const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            // Afegir dades al Chart.js
-            chart.data.labels.push(horaText);
-            chart.data.datasets[0].data.push(ultimaTemperatura);
-            
-            // Mantenir només les últimes 20 lectures per evitar col·lapsar la gràfica
-            if (chart.data.labels.length > 20) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-            }
-            
-            chart.update();
-            console.log(`Registrat a la gràfica: ${ultimaTemperatura}°C a les ${horaText}`);
-        }
-    }
-
-    // Gestionar la connexió Bluetooth
+    // 1. GESTIONAR LA CONNEXIÓ BLUETOOTH (A dalt per seguretat)
     connectBtn.addEventListener('click', async () => {
         try {
             statusText.innerText = "Buscant micro:bit...";
@@ -225,7 +202,6 @@
             timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
 
             // Iniciar el temporitzador automàtic (10 minuts = 600000 mil·lisegons)
-            // Nota de prova: pots canviar 600000 per 10000 per provar-ho cada 10 segons.
             intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
 
             device.addEventListener('gattserverdisconnected', () => {
@@ -242,68 +218,89 @@
         }
     });
 
-       // Processar el text rebut per Bluetooth
+    // 2. PROCESSAR EL TEXT REBUT PER BLUETOOTH
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
         
-        // Netegem a fons eliminant espais i caràcters estranys
+        // Netejar a fons eliminant caràcters ocults o salts de línia
         let cleanedString = rawString.replace(/[^\d.-]/g, '');
         
         if (cleanedString) {
             let temperatura = parseFloat(cleanedString);
             
             if (!isNaN(temperatura)) {
-                // Guardem el valor a la variable global
                 ultimaTemperatura = temperatura;
 
-                // 1. Actualitzar el termòmetre visual immediatament
+                // Actualitzar el termòmetre visual immediatament
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                // 2. FORÇAR EL PRIMER PUNT A LA GRÀFICA
-                // Si la gràfica està buida, hi afegim directament la primera lectura a l'acte
+                // Forçar el primer punt a la gràfica si encara està buida
                 if (chart && chart.data.datasets[0].data.length === 0) {
                     registrarTemperaturaEnGrafica();
-                
+                }
+            }
+        }
+    }
 
-                    
-                    // Configurar la gràfica de Chart.js
-    const ctx = document.getElementById('tempChart').getContext('2d');
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [], // Aquí aniran les hores (ex: "14:32")
-            datasets: [{
-                label: 'Temperatura (°C)',
-                data: [], // Aquí aniran els valors numèrics
-                borderColor: '#007bff',
-                backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                borderWidth: 3,
-                tension: 0.3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                y: {
-                    min: 0,
-                    max: 50,
-                    title: { display: true, text: 'Temperatura (°C)' }
-                },
-                x: {
-                    title: { display: true, text: 'Hora del registre' }
+    // 3. REGISTRAR DADES A LA GRÀFICA
+    function registrarTemperaturaEnGrafica() {
+        if (ultimaTemperatura !== null && chart) {
+            const ara = new Date();
+            const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Afegir dades correctament a l'estructura de Chart.js
+            chart.data.labels.push(horaText);
+            chart.data.datasets[0].data.push(ultimaTemperatura);
+            
+            // Limitar a un màxim de 20 punts per pantalla
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+            
+            chart.update();
+        }
+    }
+
+    // 4. CONFIGURAR LA GRÀFICA DE CHART.JS (Al final de tot per protegir el codi)
+    try {
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [{
+                    label: 'Temperatura (°C)',
+                    data: [], 
+                    borderColor: '#007bff',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    borderWidth: 3,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 50,
+                        title: { display: true, text: 'Temperatura (°C)' }
+                    },
+                    x: {
+                        title: { display: true, text: 'Hora del registre' }
+                    }
                 }
             }
-        }
-    });
-                }
-            }
-        }
+        });
+    } catch (e) {
+        console.error("No s'ha pogut iniciar la gràfica, però el Bluetooth continuarà funcionant:", e);
     }
 </script>
 
