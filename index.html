@@ -187,6 +187,7 @@
 </div>
 
 <script>
+   
     const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
     const UART_TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
@@ -199,7 +200,7 @@
 
     let device = null;
     let ultimaTemperatura = null; 
-    let intervalGrafica = null;
+    let intervalGrafica = null; // Tornem a activar la variable del temporitzador
     
     let llistaTemperatures = [];
     let llistaHores = [];
@@ -226,10 +227,11 @@
             await characteristic.startNotifications();
             characteristic.addEventListener('characteristicvaluechanged', handleData);
 
-            statusText.innerText = "Connectat! Prem el Botó A a la micro:bit.";
+            statusText.innerText = "Connectat! El sistema registrarà cada 10 minuts de forma automàtica i també quan premis el Botó A.";
             connectBtn.style.display = 'none';
-            timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
+            timerDisplay.innerText = "Esperant dades...";
 
+            // 1. TEMPORITZADOR AUTOMÀTIC: Cada 10 minuts (600000 ms) agafa la temperatura del sistema i fa una barra nova
             intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
 
             device.addEventListener('gattserverdisconnected', () => {
@@ -246,7 +248,7 @@
         }
     });
 
-    // RECEPCIÓ DE DADES
+    // RECEPCIÓ DE DADES (Es dispara a l'instant cada cop que prems el Botó A a la micro:bit)
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
@@ -260,32 +262,35 @@
             if (!isNaN(temperatura)) {
                 ultimaTemperatura = temperatura;
 
+                // Actualitzar el termòmetre visual de l'esquerra immediatament
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                if (llistaTemperatures.length === 0) {
-                    registrarTemperaturaEnGrafica();
-                }
+                // ACCIÓ REACCIÓ: Registra una barra a la gràfica al mateix moment que prems el Botó A
+                registrarTemperaturaEnGrafica();
             }
         }
     }
 
-    // REGISTRAR HISTÒRIC
+    // REGISTRAR HISTÒRIC (Aquesta funció la crida tant el Botó A com el temporitzador dels 10 minuts)
     function registrarTemperaturaEnGrafica() {
         if (ultimaTemperatura !== null) {
             const ara = new Date();
             const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             
+            // Afegir dades a les llistes
             llistaHores.push(horaText);
             llistaTemperatures.push(ultimaTemperatura);
             
-            if (llistaTemperatures.length > 10) {
+            // Limitar el gràfic a les últimes 15 barres consecutives perquè es vegi bé
+            if (llistaTemperatures.length > 15) {
                 llistaHores.shift();
                 llistaTemperatures.shift();
             }
             
+            // Re-dibuixar totes les barres a la pantalla
             graficaVisual.innerHTML = "";
             for (let i = 0; i < llistaTemperatures.length; i++) {
                 let temp = llistaTemperatures[i];
@@ -303,7 +308,8 @@
                 graficaVisual.appendChild(barraElement);
             }
             
-            let resumText = "Històric guardat: ";
+            // Text inferior amb la llista completa de dades guardades
+            let resumText = "Històric total (Auto + Clics): ";
             for (let i = 0; i < llistaTemperatures.length; i++) {
                 resumText += `[${llistaHores[i]}: ${llistaTemperatures[i]}°C] `;
             }
