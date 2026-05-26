@@ -232,7 +232,7 @@
             timerDisplay.innerText = "Esperant dades...";
 
             // 1. TEMPORITZADOR AUTOMÀTIC: Cada 10 minuts (600000 ms) agafa la temperatura del sistema i fa una barra nova
-            intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
+            intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 10000);
 
             device.addEventListener('gattserverdisconnected', () => {
                 statusText.innerText = "Dispositiu desconnectat.";
