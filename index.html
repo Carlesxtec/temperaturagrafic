@@ -4,13 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Termòmetre i Gràfica micro:bit</title>
-    <!-- Llibreria Chart.js integrada de forma local (No depèn d'Internet) -->
-    <script>
-    /*! Chart.js v2.9.4 | (c) 2020 Chart.js Contributors | MIT License */
-    !function(t,e){"object"==typeof exports&&"undefined"!=typeof module?module.exports=e():"function"==typeof define&&define.amd?define(e):t.Chart=e()}(this,function(){"use strict";return function(t){var e={};function n(r){if(e[r])return e[r].exports;var i=e[r]={i:r,l:!1,exports:{}};return t[r].call(i.exports,i,i.exports,n),i.l=!0,i.exports}return n.m=t,n.c=e,n.d=function(t,e,r){n.o(t,e)||Object.defineProperty(t,e,{enumerable:!0,get:e})},n.r=function(t){"undefined"!=typeof Symbol&&Symbol.toStringTag&&Object.defineProperty(t,Symbol.toStringTag,{value:"Module"}),Object.defineProperty(t,"__esModule",{value:!0})},n.t=function(t,e){if(1&e&&(t=n(t)),8&e)return t;if(4&e&&"object"==typeof t&&t&&t.__esModule)return t;var r=Object.create(null);if(n.r(r),Object.defineProperty(r,"default",{enumerable:!0,value:t}),2&e&&"string"!=typeof t)for(var i in t)n.d(r,i,function(e){return t[e]}.bind(null,i));return r},n.n=function(t){var e=t&&t.__esModule?function(){return t.default}:function(){return t};return n.d(e,"a",e),e},n.o=function(t,e){return Object.prototype.hasOwnProperty.call(t,e)},n.p="",n(n.s=4)}([function(t,e,n){},function(t,e,n){},function(t,e,n){},function(t,e,n){},function(t,e,n){var r=window.Chart||{};r.helpers={},window.Chart=r,t.exports=r}])});
-    // Versió de contingència compacta per assegurar la inicialització de l'objecte Chart
-    if(typeof Chart==="undefined"){var Chart=function(ctx,config){this.ctx=ctx;this.config=config;this.data=config.data;this.update=function(){var l=this.data.labels;var d=this.data.datasets[0].data;var txt="Històric punts: ";for(var i=0;i<l.length;i++){txt+= "["+l[i]+": "+d[i]+"°C] "};document.getElementById("timerDisplay").innerText=txt;};};}
-    </script>
+    <!-- Línia per evitar l'error inofensiu del favicon -->
+    <link rel="icon" href="data:,">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -143,29 +138,34 @@
             height: 200px;
             display: flex;
             align-items: flex-end;
-            gap: 5px;
+            gap: 10px;
             background: #fdfdfd;
             border: 2px solid #ccc;
-            padding: 10px;
+            padding: 15px;
             box-sizing: border-box;
             border-radius: 10px;
         }
         .bar {
             flex: 1;
             background-color: #007bff;
-            border-radius: 4px 4px 0 0;
+            border-radius: 5px 5px 0 0;
             text-align: center;
             color: white;
-            font-size: 10px;
+            font-size: 11px;
             padding-bottom: 5px;
-            transition: height 0.3s;
+            min-height: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
 <div class="card control-panel">
-    <h1>Termòmetre amb Històric Digital</h1>
+    <h1>Termòmetre amb Històric Digital Natiu</h1>
     <button id="connectBtn">Connectar micro:bit</button>
     <div id="status" class="status">Desconnectat. Clica per connectar el Bluetooth.</div>
 </div>
@@ -185,7 +185,7 @@
     <div class="card chart-card">
         <h2>Historial de Temperatura (Cada 10 min)</h2>
         <div id="graficaVisual" class="visual-bar-container">
-            <!-- Les barres es crearan automàticament aquí -->
+            <!-- Les barres es pintaran aquí de forma dinàmica -->
         </div>
         <div id="timerDisplay" class="timer-text">Esperant connexió...</div>
     </div>
@@ -206,12 +206,11 @@
     let ultimaTemperatura = null; 
     let intervalGrafica = null;
     
-    // Creem l'estructura de dades directament en memòria local
-    let historicDades = {
-        labels: [],
-        datasets: [{ data: [] }]
-    };
+    // Estructura simplificada neta per guardar les dades sense objectes complexos
+    let llistaTemperatures = [];
+    let llistaHores = [];
 
+    // ACCIÓ DEL BOTÓ DE CONNEXIÓ
     connectBtn.addEventListener('click', async () => {
         try {
             statusText.innerText = "Buscant micro:bit...";
@@ -236,7 +235,7 @@
             connectBtn.style.display = 'none';
             timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
 
-            // Iniciar el temporitzador automàtic (10 minuts)
+            // Temporitzador per registrar cada 10 minuts (600000 ms)
             intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
 
             device.addEventListener('gattserverdisconnected', () => {
@@ -253,19 +252,58 @@
         }
     });
 
+    // RECEPCIÓ DE DADES DES DE LA MICRO:BIT
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
+        
+        // Extreure qualsevol dígit, negatius o decimals de la resposta
         let cleanedString = rawString.replace(/[^\d.-]/g, '');
         
-        if (cleanedString) {
+        if (cleanedString !== "") {
             let temperatura = parseFloat(cleanedString);
             
             if (!isNaN(temperatura)) {
                 ultimaTemperatura = temperatura;
 
-                // Actualitzar el termòmetre de l'esquerra
+                // Moure el termòmetre visual immediatament
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
+                fluid.style.height = percentatge + "%";
+
+                // Si és la primera vegada absoluta, pintem la barra de forma immediata
+                if (llistaTemperatures.length === 0) {
+                    registrarTemperaturaEnGrafica();
+                }
+            }
+        }
+    }
+
+    // REGISTRAR I DIBUIXAR LES BARRES
+    function registrarTemperaturaEnGrafica() {
+        if (ultimaTemperatura !== null) {
+            const ara = new Date();
+            const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Afegir dades a les llistes bàsiques
+            llistaHores.push(horaText);
+            llistaTemperatures.push(ultimaTemperatura);
+            
+            // Limitar el gràfic a les últimes 10 lectures
+            if (llistaTemperatures.length > 10) {
+                llistaHores.shift();
+                llistaTemperatures.shift();
+            }
+            
+            // Re-dibuixar les barres visuals de la pantalla
+            graficaVisual.innerHTML = "";
+            for (let i = 0; i < llistaTemperatures.length; i++) {
+                let temp = llistaTemperatures[i];
+                let hora = llistaHores[i];
+                
+                // Calcular alçada basat en escala 0-50°C
+                let alcadaBarra = ((temp - 0) / (50 - 0)) * 100;
+                alcadaBarra = Math.max(8, Math.min(100, alcadaBarra)); 
+                
