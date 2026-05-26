@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termòmetre i Gràfica micro:bit</title>
+    <!-- Carreguem la llibreria Chart.js des del seu CDN oficial -->
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .dashboard {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background-color: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .control-panel {
+            width: 100%;
+            max-width: 1000px;
+            margin-bottom: 10px;
+        }
+
+        .thermometer-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 340px;
+        }
+
+        .chart-card {
+            flex: 2;
+            min-width: 450px;
+        }
+
+        h1, h2 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        h1 { font-size: 24px; }
+        h2 { font-size: 18px; color: #555; }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* Disseny del Termòmetre */
+        .thermometer-container {
+            margin: 25px auto;
+            width: 50px;
+            height: 200px;
+            position: relative;
+            background: #e0e0e0;
+            border-radius: 25px 25px 0 0;
+            border: 4px solid #333;
+            border-bottom: none;
+        }
+
+        .thermometer-bulb {
+            width: 80px;
+            height: 80px;
+            background: #ff3b30;
+            border-radius: 50%;
+            position: absolute;
+            bottom: -45px;
+            left: -19px;
+            border: 4px solid #333;
+            z-index: 1;
+        }
+
+        .fluid {
+            width: 100%;
+            background: #ff3b30;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            border-radius: 20px 20px 0 0;
+            height: 0%;
+            transition: height 0.5s ease-out;
+        }
+
+        .temperature-text {
+            font-size: 42px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 55px;
+        }
+
+        .timer-text {
+            font-size: 13px;
+            color: #888;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card control-panel">
+    <h1>Termòmetre amb Històric en Temps Real</h1>
+    <button id="connectBtn">Connectar micro:bit</button>
+    <div id="status" class="status">Desconnectat. Clica per connectar el Bluetooth.</div>
+</div>
+
+<div class="dashboard">
+    <!-- Targeta del Termòmetre -->
+    <div class="card thermometer-card">
+        <h2>Valor Actual (Botó A)</h2>
+        <div class="thermometer-container">
+            <div id="fluid" class="fluid"></div>
+            <div class="thermometer-bulb"></div>
+        </div>
+        <div id="tempDisplay" class="temperature-text">-- °C</div>
+    </div>
+
+    <!-- Targeta de la Gràfica -->
+    <div class="card chart-card">
+        <h2>Historial de Temperatura (Cada 10 min)</h2>
+        <canvas id="tempChart" style="width:100%; height:280px;"></canvas>
+        <div id="timerDisplay" class="timer-text">Esperant connexió...</div>
+    </div>
+</div>
+
+<script>
+    const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+    const UART_TX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+
+    const connectBtn = document.getElementById('connectBtn');
+    const statusText = document.getElementById('status');
+    const tempDisplay = document.getElementById('tempDisplay');
+    const fluid = document.getElementById('fluid');
+    const timerDisplay = document.getElementById('timerDisplay');
+
+    let device = null;
+    let ultimaTemperatura = null; 
+    let intervalGrafica = null;
+    let chart = null;
+
+    // Configurar la gràfica de Chart.js
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], // Aquí aniran les hores (ex: "14:32")
+            datasets: [{
+                label: 'Temperatura (°C)',
+                data: [], // Aquí aniran els valors numèrics
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                borderWidth: 3,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    min: 0,
+                    max: 50,
+                    title: { display: true, text: 'Temperatura (°C)' }
+                },
+                x: {
+                    title: { display: true, text: 'Hora del registre' }
+                }
+            }
+        }
+    });
+
+    // Funció per afegir dades a la gràfica
+    function registrarTemperaturaEnGrafica() {
+        if (ultimaTemperatura !== null) {
+            const ara = new Date();
+            // Formatar l'hora actual en format "HH:MM:SS"
+            const horaText = ara.toLocaleTimeString('ca-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // Afegir dades al Chart.js
+            chart.data.labels.push(horaText);
+            chart.data.datasets[0].data.push(ultimaTemperatura);
+            
+            // Mantenir només les últimes 20 lectures per evitar col·lapsar la gràfica
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+            
+            chart.update();
+            console.log(`Registrat a la gràfica: ${ultimaTemperatura}°C a les ${horaText}`);
+        }
+    }
+
+    // Gestionar la connexió Bluetooth
+    connectBtn.addEventListener('click', async () => {
+        try {
+            statusText.innerText = "Buscant micro:bit...";
+            device = await navigator.bluetooth.requestDevice({
+                filters: [{ namePrefix: 'BBC micro:bit' }],
+                optionalServices: [UART_SERVICE_UUID]
+            });
+
+            statusText.innerText = "Connectant al servidor...";
+            const server = await device.gatt.connect();
+
+            statusText.innerText = "Accedint al servei UART...";
+            const service = await server.getPrimaryService(UART_SERVICE_UUID);
+
+            statusText.innerText = "Configurant lectura...";
+            const characteristic = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+
+            await characteristic.startNotifications();
+            characteristic.addEventListener('characteristicvaluechanged', handleData);
+
+            statusText.innerText = "Connectat! Prem el Botó A a la micro:bit.";
+            connectBtn.style.display = 'none';
+            timerDisplay.innerText = "Pròxim registre automàtic en 10 minuts.";
+
+            // Iniciar el temporitzador automàtic (10 minuts = 600000 mil·lisegons)
+            // Nota de prova: pots canviar 600000 per 10000 per provar-ho cada 10 segons.
+            intervalGrafica = setInterval(registrarTemperaturaEnGrafica, 600000);
+
+            device.addEventListener('gattserverdisconnected', () => {
+                statusText.innerText = "Dispositiu desconnectat.";
+                connectBtn.style.display = 'inline-block';
+                timerDisplay.innerText = "Esperant connexió...";
+                clearInterval(intervalGrafica);
+                ultimaTemperatura = null;
+            });
+
+        } catch (error) {
+            console.error(error);
+            statusText.innerText = "Error: " + error.message;
+        }
+    });
+
+    // Processar el text rebut per Bluetooth
+    function handleData(event) {
+        const value = event.target.value;
+        let decoder = new TextDecoder('utf-8');
+        let rawString = decoder.decode(value).trim();
+        let cleanedString = rawString.replace(/[^\d.-]/g, '');
+        
+        if (cleanedString) {
+            let temperatura = parseFloat(cleanedString);
+            if (!isNaN(temperatura)) {
+                // Guardem el valor a la variable global per quan expiri el cronòmetre dels 10 minuts
+                ultimaTemperatura = temperatura;
+
+                // Actualitzar el termòmetre visual immediatament
+                tempDisplay.innerText = temperatura + " °C";
+                let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
+                percentatge = Math.max(0, Math.min(100, percentatge));
+                fluid.style.height = percentatge + "%";
+
+                // Si és la primeríssima dada que rebem, la pintem ja a la gràfica perquè no comenci buida
+                if (chart.data.datasets[0].data.length === 0) {
+                    registrarTemperaturaEnGrafica();
+                }
+            }
+        }
+    }
+</script>
+
+</body>
+</html>
