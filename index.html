@@ -242,28 +242,37 @@
         }
     });
 
-    // Processar el text rebut per Bluetooth
+       // Processar el text rebut per Bluetooth
     function handleData(event) {
         const value = event.target.value;
         let decoder = new TextDecoder('utf-8');
         let rawString = decoder.decode(value).trim();
+        
+        // Netegem a fons eliminant espais i caràcters estranys
         let cleanedString = rawString.replace(/[^\d.-]/g, '');
         
         if (cleanedString) {
             let temperatura = parseFloat(cleanedString);
+            
             if (!isNaN(temperatura)) {
-                // Guardem el valor a la variable global per quan expiri el cronòmetre dels 10 minuts
+                // Guardem el valor a la variable global
                 ultimaTemperatura = temperatura;
 
-                // Actualitzar el termòmetre visual immediatament
+                // 1. Actualitzar el termòmetre visual immediatament
                 tempDisplay.innerText = temperatura + " °C";
                 let percentatge = ((temperatura - 0) / (50 - 0)) * 100;
                 percentatge = Math.max(0, Math.min(100, percentatge));
                 fluid.style.height = percentatge + "%";
 
-                // Si és la primeríssima dada que rebem, la pintem ja a la gràfica perquè no comenci buida
-                if (chart.data.datasets[0].data.length === 0) {
+                // 2. FORÇAR EL PRIMER PUNT A LA GRÀFICA
+                // Si la gràfica està buida, hi afegim directament la primera lectura a l'acte
+                if (chart && chart.data.datasets[0].data.length === 0) {
                     registrarTemperaturaEnGrafica();
+                }
+            }
+        }
+    }
+
                     
                     // Configurar la gràfica de Chart.js
     const ctx = document.getElementById('tempChart').getContext('2d');
